@@ -15,7 +15,7 @@ class WechatTemplateModel
 {
     public $pdo;
     public $prefix;
-    public $table = 'mega_wechat_template';
+    public $table = 'wechat_template';
 
     public function __construct()
     {
