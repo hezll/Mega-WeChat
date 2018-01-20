@@ -6,7 +6,7 @@
  * Time: 15:48
  */
 include dirname(__DIR__) . "/autoload.php";
-$wechatApi = new \Wechat\WechatApi('wx90c4bf2cf0dae125', 'e01207cd557f62c73f5099aae83a9f15', 'e01207cd557f62c73f5099aae83a9f15');
+$wechatApi = new \Wechat\WechatApi('wx4b8f78b946eca353', '4aac827690c7f98eb2ac9fce50b0d48e', '4aac827690c7f98eb2ac9fce50b0d48e');
 $result = $wechatApi->sendTemplateMessage('{
   "touser": "oIzphw8oUKZmr7q3v8H94wl9e92w",
   "template_id": "9lPW5ofAo8QGxsp6gCfMe0ZBNbzc9zoezKhFrh9FhEA",
