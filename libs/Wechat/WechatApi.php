@@ -134,4 +134,36 @@ class WechatApi extends BaseWechatApi
 
         return $result;
     }
+
+
+    /**
+     * 发送模板消息
+     */
+    const WECHAT_CUSTOMER_MESSAGE_SEND_PREFIX = '/cgi-bin/message/custom/send';
+    /**
+     * 发送客服消息
+     * @param array $data 模板需要的数据
+     * @param bool $force 强制获取token
+     * @return int|bool
+     */
+    public function sendCustomerMessage($data, $force = false)
+    {
+        $url = $this->httpBuildQuery(self::WECHAT_CUSTOMER_MESSAGE_SEND_PREFIX, [
+            'access_token' => $this->getAccessToken($force)
+        ]);
+
+        $result = $this->http($url, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : $data
+        ]);
+
+        switch ($result['errcode']) {
+            case 42001 : // token过期
+            case 40001 : // 不是最新的token
+                $result = $this->sendCustomerMessage($data, true);
+                return $result;
+        }
+
+        return $result;
+    }
 }
