@@ -53,7 +53,8 @@ class WechatApi extends BaseWechatApi
         //init swoole table 共享token准备
 
         $this->_wxtokenTable = new \swoole_table(Config::get('server.table_size'));
-        $this->_wxtokenTable->column('wxtoken', \swoole_table::TYPE_STRING, Config::get('server.template_size'));
+        $this->_wxtokenTable->column('access_token', \swoole_table::TYPE_STRING, 1024);
+        $this->_wxtokenTable->column('expire', \swoole_table::TYPE_STRING,20);
         $this->_wxtokenTable->create();
     }
 
@@ -99,7 +100,7 @@ class WechatApi extends BaseWechatApi
     {
         $this->_accessToken = $this->_wxtokenTable->get($this->appId);
         $time = time(); // 为了更精确控制.取当前时间计算
-        if ($force || $this->_accessToken === null || $this->_accessToken['expire'] < ($time - 180)) {
+        if ($force || !$this->_accessToken ||  $this->_accessToken === null || (isset($this->_accessToken['expire'])&& $this->_accessToken['expire'] < ($time - 180)))  {
             if (!($result = $this->requestAccessToken())) {
                 throw new \Exception('Fail to get access_token from wechat server.', 500);
             }
