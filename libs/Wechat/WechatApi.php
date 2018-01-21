@@ -39,11 +39,21 @@ class WechatApi extends BaseWechatApi
      */
     public $encodingAesKey;
 
+    private $_wxtokenTable;
+    private $_accessToken;
+
     public function __construct($appId, $appSecret, $token)
     {
         $this->appId = $appId;
         $this->appSecret = $appSecret;
         $this->token = $token;
+
+
+        //init swoole table 共享token准备
+
+        $this->_wxtokenTable = new \swoole_table(Config::get('server.table_size'));
+        $this->_wxtokenTable->column('wxtoken', \swoole_table::TYPE_STRING, Config::get('server.template_size'));
+        $this->_wxtokenTable->create();
     }
 
     /**
@@ -78,6 +88,27 @@ class WechatApi extends BaseWechatApi
         return isset($result['access_token']) ? $result : false;
     }
 
+    /**
+     * 用swoole table 来重写
+     * @param bool $force
+     * @return mixed
+     * @throws \Exception
+     */
+    public function getAccessToken($force = false)
+    {
+        $this->_accessToken = $this->_wxtokenTable->get($this->appId);
+        $time = time(); // 为了更精确控制.取当前时间计算
+        if ($force || $this->_accessToken === null || $this->_accessToken['expire'] < ($time - 180)) {
+            if (!($result = $this->requestAccessToken())) {
+                throw new \Exception('Fail to get access_token from wechat server.', 500);
+            }
+            $result['expire'] = $time + $result['expires_in'];
+            $this->setAccessToken($result);
+            $this->_wxtokenTable->set($this->appId,$result);
+
+        }
+        return $this->_accessToken['access_token'];
+    }
     /**
      * @inheritdoc
      * @param bool $force 是否强制获取access_token, 该设置会在access_token使用错误时, 是否再获取一次access_token并再重新提交请求
