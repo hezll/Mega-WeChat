@@ -2,6 +2,7 @@
 
 namespace Wechat;
 
+use Swoole\Util\Config;
 /**
  * Created by PhpStorm.
  * User: Rain
