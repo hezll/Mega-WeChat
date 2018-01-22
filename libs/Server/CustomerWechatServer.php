@@ -35,17 +35,17 @@ class CustomerWechatServer extends TcpServer
 
     public function init()
     {
-//        self::$taskActiveNum = new \swoole_atomic(0);
-//        self::$templateTable = new \swoole_table(Config::get('server.table_size'));
-//        self::$templateTable->column('tmpl', \swoole_table::TYPE_STRING, Config::get('server.template_size'));
-//        self::$templateTable->create();
-//
-//        $model = new WechatTemplateModel();
-//        $templates = $model->getAll(Config::get('server.table_size'));
-//        foreach($templates as $template)
-//        {
-//            self::$templateTable->set($template['tmpl_key'], ['tmpl' => $template['template']]);
-//        }
+        self::$taskActiveNum = new \swoole_atomic(0);
+        self::$templateTable = new \swoole_table(Config::get('server.table_size'));
+        self::$templateTable->column('tmpl', \swoole_table::TYPE_STRING, Config::get('server.template_size'));
+        self::$templateTable->create();
+
+        $model = new WechatTemplateModel();
+        $templates = $model->getAll(Config::get('server.table_size'));
+        foreach($templates as $template)
+        {
+            self::$templateTable->set($template['tmpl_key'], ['tmpl' => $template['template']]);
+        }
     }
 
 }
