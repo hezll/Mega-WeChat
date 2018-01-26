@@ -45,9 +45,9 @@ abstract class Server implements Driver
     {
         // Initialization server startup parameters
         $this->setting = array_merge(array(
-            'worker_num' => 8,                      // worker process num
-            'backlog' => 128,                       // listen backlog
-            'log_file' => '/tmp/swoole.log',      // server log
+            'worker_num' => isset($this->config['setting']['worker_num']) ? $this->config['setting']['worker_num']:8,                      // worker process num
+            'backlog' => isset($this->config['setting']['backlog']) ? $this->config['setting']['backlog']:128,                       // listen backlog
+            'log_file' => isset($this->config['log']['log_file']) ? $this->config['log']['log_file']:'/tmp/swoole.log',      // server log
         ), $this->setting);
         $this->setHost();
         $this->register();
