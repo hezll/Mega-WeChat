@@ -323,7 +323,9 @@ abstract class Server implements Driver
         $message = exec($command, $output, $returnCode);
         unset($output);
         if ($returnCode) {
-            $this->log('调用运行任务命令失败！ ' . $message);
+            $this->log('Kill '.$this->port.' 端口失败！ ' . $message);
+        }else{
+            $this->log('Kill '. $this->port.' 端口成功！ ' . $message);
         }
         // remove listener
         if (is_array($this->listen)) {
@@ -336,6 +338,8 @@ abstract class Server implements Driver
                 unset($output);
                 if ($returnCode) {
                     $this->log('调用运行任务命令失败！ ' . $message);
+                }else{
+                    $this->log('Kill '. $this->port.' 端口成功！ ' . $message);
                 }
             }
         }
