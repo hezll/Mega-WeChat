@@ -90,7 +90,7 @@ abstract class Server implements Driver
     {
         $mainSetting = $this->config['server'] ? $this->config['server'] : array();
         $runSetting = $this->config['setting'] ? $this->config['setting'] : array();
-        //$this->processName = $mainSetting['server_name'] ? $mainSetting['server_name'] : 'swoole_server'; //todo
+        $this->processName = $mainSetting['server_name'] ? $mainSetting['server_name'] : 'swoole_server'; //todo
         $this->masterPidFile = $this->runPath . '/' . $this->processName . '.master.pid';
         $this->managerPidFile = $this->runPath . '/' . $this->processName . '.manager.pid';
         $this->setting = array_merge($this->setting, $runSetting);
