@@ -318,6 +318,27 @@ abstract class Server implements Driver
             $this->log($this->processName . ": stop\033[31;40m [FAIL] \033[0m");
             return false;
         }
+        //kill port
+        $command =  sprintf("kill -9 `lsof -t -i:%s`",$this->port);
+        $message = exec($command, $output, $returnCode);
+        unset($output);
+        if ($returnCode) {
+            $this->log('调用运行任务命令失败！ ' . $message);
+        }
+        // remove listener
+        if (is_array($this->listen)) {
+            foreach ($this->listen as $v) {
+                if (!$v['host'] || !$v['port']) {
+                    continue;
+                }
+                $command =  sprintf("kill -9 `lsof -t -i:%s`",$v['port']);
+                $message = exec($command, $output, $returnCode);
+                unset($output);
+                if ($returnCode) {
+                    $this->log('调用运行任务命令失败！ ' . $message);
+                }
+            }
+        }
         unlink($this->masterPidFile);
         unlink($this->managerPidFile);
         usleep(50000);
