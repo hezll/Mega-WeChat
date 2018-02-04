@@ -43,30 +43,7 @@ class CustomerWechatProtocol extends Base
      */
     function onStart(\swoole_server $server, $workerId)
     {
-        // worker进程
-        if (!$server->taskworker) {
-            $filePath = Config::get('server.queue_file_path') . '/customer-task-' . $workerId;
-            try
-            {
-                $this->queue = new FileQueue($filePath);
-            }
-            catch (\Exception $e)
-            {
-                $this->logger->warning($e->getMessage());
-                $this->server->shutdown();
-            }
-            $this->taskWorkerNum = $this->server->setting['task_worker_num'];
 
-            // 定时检测队列是否有未处理的数据
-            $server->tick(10000, function() use ($server) {
-                if (MegaWechatServer::$taskActiveNum->get() < $this->taskWorkerNum) {
-                    if (($message = $this->queue->pop()) !== null) {
-                        MegaWechatServer::$taskActiveNum->add(1);
-                        $server->task($message);
-                    }
-                }
-            });
-        }
     }
 
     function onConnect(\swoole_server $server, $fd, $from_id)
@@ -76,111 +53,17 @@ class CustomerWechatProtocol extends Base
 
     function onReceive(\swoole_server $server, $fd, $from_id, $data)
     {
-        try {
-            $command = $this->decode($data, $fd);
 
-            if ($command instanceof SendCommand) {
-                $this->logger->info(__LINE__ . " SendCommand {$command->toString()}");
-                // 若微信模板消息存在，则放入队列
-                if (MegaWechatServer::$templateTable->exist($command->getKey())) {
-                    $this->queue->push(serialize($command));
-                } else {
-                    $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'template key not exists', $command->getOpaque());
-                    $server->send($command->getFd(), $this->encode($message));
-                }
-            } else if ($command instanceof PushCommand) {
-                $this->logger->info(__LINE__ . " PushCommand {$command->toString()}");
-                if (MegaWechatServer::$templateTable->exist($command->getKey())) {
-                    $this->queue->push(serialize($command));
-                    $message = new BooleanCommand(HttpStatus::SUCCESS, null, $command->getOpaque());
-                    $server->send($fd, $this->encode($message));
-                } else {
-                    $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'template key not exists', $command->getOpaque());
-                    $server->send($fd, $this->encode($message));
-                }
-            } else if ($command instanceof SetTableCommand) {
-                try {
-                    $this->logger->info(__LINE__ . " SetTableCommand {$command->toString()}");
-                    $model = new WechatTemplateModel();
-                    $template = $model->getTemplate($command->getKey());
-                    if ($template !== false) {
-                        $message = new BooleanCommand(HttpStatus::SUCCESS, null, $command->getOpaque());
-                        if (MegaWechatServer::$templateTable->exist($template['tmpl_key'])) {
-                            MegaWechatServer::$templateTable->set($template['tmpl_key'], ['tmpl' => $template['template']]);
-                        } else {
-                            if (count(MegaWechatServer::$templateTable) < Config::get('server.table_size')) {
-                                MegaWechatServer::$templateTable->set($template['tmpl_key'], ['tmpl' => $template['template']]);
-                            } else {
-                                $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'over table size', $command->getOpaque());
-                            }
-                        }
-                    } else {
-                        $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'template key not exists', $command->getOpaque());
-                    }
-                } catch (\Exception $ex) {
-                    $message = new BooleanCommand(HttpStatus::INTERNAL_SERVER_ERROR, $ex->getMessage(), $command->getOpaque());
-                    $this->logger->error(__LINE__ . ' SetTableCommand ' . $ex->getMessage());
-                }
-                $server->send($command->getFd(), $this->encode($message));
-                if ($message->getCode() === HttpStatus::INTERNAL_SERVER_ERROR) {
-                    $server->close($command->getFd());
-                }
-            }
-
-            if (MegaWechatServer::$taskActiveNum->get() < $this->taskWorkerNum) {
-                MegaWechatServer::$taskActiveNum->add(1);
-                $server->task($this->queue->pop());
-            }
-        } catch (CommandException $ex) {
-            $message = new BooleanCommand(HttpStatus::INTERNAL_SERVER_ERROR, $ex->getMessage(), null);
-            $this->logger->warning($ex->getMessage(), $server->connection_info($fd, -1, true));
-            $server->send($fd, $this->encode($message));
-            $server->close($fd);
-        }
     }
 
     function onShutdown(\swoole_server $server, $workerId)
     {
-        if (!$server->taskworker) {
-            if ($this->queue) {
-                $this->queue->close();
-            }
-        }
+
     }
 
     function onTask(\swoole_server $server, $taskId, $fromId, $data)
     {
-        $command = unserialize($data);
-        if ($command instanceof SendCommand or $command instanceof PushCommand) {
-            try {
-                $template = new Template();
-                $template->setOpenid($command->getOpenId());
-                $template->setData($command->getData());
-                $templateData = MegaWechatServer::$templateTable->get($command->getKey())['tmpl'];
-                $template->setTemplate($templateData);
-                $template = $template->parse();
-                $result = $this->wechatApi->sendTemplateMessage($template);
-                // SendCommand需要响应调用API接口请求
-                if ($command instanceof SendCommand) {
-                    //$result = 1; //测试使用
-                    if ($result['errcode'] === 0) {
-                        $message = new BooleanCommand(HttpStatus::SUCCESS, null, $command->getOpaque());
-                    } else {
-                        $this->logger->info(__LINE__ . ' sendTemplateMessage fail', $result);
-                        $result['openid'] = $command->getOpenId();
-                        $message = new BooleanCommand(HttpStatus::BAD_REQUEST, json_encode($result), $command->getOpaque());
-                    }
-                    $server->send($command->getFd(), $this->encode($message));
-                }
-            } catch (\Exception $ex) {
-                $this->logger->error(__LINE__ . ' SendCommand ' . $ex->getMessage());
-                $message = new BooleanCommand(HttpStatus::INTERNAL_SERVER_ERROR, $ex->getMessage(), $command->getOpaque());
-                $server->send($command->getFd(), $this->encode($message));
-                $server->close($command->getFd());
-            }
-        }
-        MegaWechatServer::$taskActiveNum->sub(1);
-        $server->finish("finish");
+
     }
 
     /**
@@ -190,12 +73,7 @@ class CustomerWechatProtocol extends Base
      */
     function onFinish(\swoole_server $server, $taskId, $data)
     {
-        if (MegaWechatServer::$taskActiveNum->get() < $this->taskWorkerNum) {
-            if (($message = $this->queue->pop()) !== null) {
-                MegaWechatServer::$taskActiveNum->add(1);
-                $server->task($message);
-            }
-        }
+
     }
 
     function onRequest($request, $response)
