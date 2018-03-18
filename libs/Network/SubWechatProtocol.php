@@ -9,7 +9,7 @@
 namespace Network;
 
 use Monolog\Logger;
-use Server\MegaWechatServer;
+use Server\SubWechatServer;
 use Swoole\Protocol\Base;
 use Swoole\Queue\FileQueue;
 use Swoole\Util\Config;
@@ -18,7 +18,7 @@ use Wechat\Template;
 use Wechat\WechatApi;
 use Wechat\WechatTemplateModel;
 
-class MegaWechatProtocol extends Base
+class SubWechatProtocol extends Base
 {
     private $taskWorkerNum;
     /** @var FileQueue  */
@@ -31,7 +31,6 @@ class MegaWechatProtocol extends Base
     public function init()
     {
         parent::init();
-        $this->setCodecFactory(new MegaWechatCodecFactory());
         $this->wechatApi = new WechatApi(Config::get('wechat.app_id'),
                         Config::get('wechat.app_secret'), Config::get('wechat.token'));
         $this->logger = Log::getLogger();
@@ -43,30 +42,7 @@ class MegaWechatProtocol extends Base
      */
     function onStart(\swoole_server $server, $workerId)
     {
-        // worker进程
-        if (!$server->taskworker) {
-            $filePath = Config::get('server.queue_file_path') . '/task-' . $workerId;
-            try
-            {
-                $this->queue = new FileQueue($filePath);
-            }
-            catch (\Exception $e)
-            {
-                $this->logger->warning($e->getMessage());
-                $this->server->shutdown();
-            }
-            $this->taskWorkerNum = $this->server->setting['task_worker_num'];
 
-            // 定时检测队列是否有未处理的数据
-            $server->tick(10000, function() use ($server) {
-                if (MegaWechatServer::$taskActiveNum->get() < $this->taskWorkerNum) {
-                    if (($message = $this->queue->pop()) !== null) {
-                        MegaWechatServer::$taskActiveNum->add(1);
-                        $server->task($message);
-                    }
-                }
-            });
-        }
     }
 
     function onConnect(\swoole_server $server, $fd, $from_id)
@@ -76,111 +52,77 @@ class MegaWechatProtocol extends Base
 
     function onReceive(\swoole_server $server, $fd, $from_id, $data)
     {
-        try {
-            $command = $this->decode($data, $fd);
+        $task_id = $server->task($data);
+        $this->logger->info("收到异步任务：id={$task_id}：openid={$data}");
 
-            if ($command instanceof SendCommand) {
-                $this->logger->info(__LINE__ . " SendCommand {$command->toString()}");
-                // 若微信模板消息存在，则放入队列
-                if (MegaWechatServer::$templateTable->exist($command->getKey())) {
-                    $this->queue->push(serialize($command));
-                } else {
-                    $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'template key not exists', $command->getOpaque());
-                    $server->send($command->getFd(), $this->encode($message));
-                }
-            } else if ($command instanceof PushCommand) {
-                $this->logger->info(__LINE__ . " PushCommand {$command->toString()}");
-                if (MegaWechatServer::$templateTable->exist($command->getKey())) {
-                    $this->queue->push(serialize($command));
-                    $message = new BooleanCommand(HttpStatus::SUCCESS, null, $command->getOpaque());
-                    $server->send($fd, $this->encode($message));
-                } else {
-                    $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'template key not exists', $command->getOpaque());
-                    $server->send($fd, $this->encode($message));
-                }
-            } else if ($command instanceof SetTableCommand) {
-                try {
-                    $this->logger->info(__LINE__ . " SetTableCommand {$command->toString()}");
-                    $model = new WechatTemplateModel();
-                    $template = $model->getTemplate($command->getKey());
-                    if ($template !== false) {
-                        $message = new BooleanCommand(HttpStatus::SUCCESS, null, $command->getOpaque());
-                        if (MegaWechatServer::$templateTable->exist($template['tmpl_key'])) {
-                            MegaWechatServer::$templateTable->set($template['tmpl_key'], ['tmpl' => $template['template']]);
-                        } else {
-                            if (count(MegaWechatServer::$templateTable) < Config::get('server.table_size')) {
-                                MegaWechatServer::$templateTable->set($template['tmpl_key'], ['tmpl' => $template['template']]);
-                            } else {
-                                $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'over table size', $command->getOpaque());
-                            }
-                        }
-                    } else {
-                        $message = new BooleanCommand(HttpStatus::BAD_REQUEST, 'template key not exists', $command->getOpaque());
-                    }
-                } catch (\Exception $ex) {
-                    $message = new BooleanCommand(HttpStatus::INTERNAL_SERVER_ERROR, $ex->getMessage(), $command->getOpaque());
-                    $this->logger->error(__LINE__ . ' SetTableCommand ' . $ex->getMessage());
-                }
-                $server->send($command->getFd(), $this->encode($message));
-                if ($message->getCode() === HttpStatus::INTERNAL_SERVER_ERROR) {
-                    $server->close($command->getFd());
-                }
-            }
-
-            if (MegaWechatServer::$taskActiveNum->get() < $this->taskWorkerNum) {
-                MegaWechatServer::$taskActiveNum->add(1);
-                $server->task($this->queue->pop());
-            }
-        } catch (CommandException $ex) {
-            $message = new BooleanCommand(HttpStatus::INTERNAL_SERVER_ERROR, $ex->getMessage(), null);
-            $this->logger->warning($ex->getMessage(), $server->connection_info($fd, -1, true));
-            $server->send($fd, $this->encode($message));
-            $server->close($fd);
-        }
     }
 
     function onShutdown(\swoole_server $server, $workerId)
     {
-        if (!$server->taskworker) {
-            if ($this->queue) {
-                $this->queue->close();
-            }
-        }
+
     }
 
     function onTask(\swoole_server $server, $taskId, $fromId, $data)
     {
-        $command = unserialize($data);
-        if ($command instanceof SendCommand or $command instanceof PushCommand) {
-            try {
-                $template = new Template();
-                $template->setOpenid($command->getOpenId());
-                $template->setData($command->getData());
-                $templateData = MegaWechatServer::$templateTable->get($command->getKey())['tmpl'];
-                $template->setTemplate($templateData);
-                $template = $template->parse();
-                $result = $this->wechatApi->sendTemplateMessage($template);
-                // SendCommand需要响应调用API接口请求
-                if ($command instanceof SendCommand) {
-                    //$result = 1; //测试使用
-                    if ($result['errcode'] === 0) {
-                        $message = new BooleanCommand(HttpStatus::SUCCESS, null, $command->getOpaque());
-                    } else {
-                        $this->logger->info(__LINE__ . ' sendTemplateMessage fail', $result);
-                        $result['openid'] = $command->getOpenId();
-                        $message = new BooleanCommand(HttpStatus::BAD_REQUEST, json_encode($result), $command->getOpaque());
-                    }
-                    $server->send($command->getFd(), $this->encode($message));
-                }
-            } catch (\Exception $ex) {
-                $this->logger->error(__LINE__ . ' SendCommand ' . $ex->getMessage());
-                $message = new BooleanCommand(HttpStatus::INTERNAL_SERVER_ERROR, $ex->getMessage(), $command->getOpaque());
-                $server->send($command->getFd(), $this->encode($message));
-                $server->close($command->getFd());
+//$this->logger->info("On Task@[{$taskId}:{$fromId}] close");
+        $data = json_decode($data,true);
+        //解析操作事件
+
+        //关注后回复消息
+        if(isset($data['event'])&&$data['event']=='replySub'){
+            //回复最近阅读章节
+            $content = ['kf_account'=>'kf2002@gh_26a30bfcfb6e','touser'=>$data['openid'],'msgtype'=>'text','text'=>['content'=>
+                "\"您已连续签到1天，获得18书币奖励，连续签到最多每日获得33书币奖励～
+
+
+<a href='https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxd581300b5a3960eb&redirect_uri=http%3A%2F%2Fm.nikanxs.com%2Fwechatrdct%2Fauth%3Fe%3Dproduct%26backUrl%3Dhttp%253A%252F%252Fwww.nikanxs.com%252Fread%252F%253Fbid%253D4789%2526chapter%253D305007&response_type=code&scope=snsapi_userinfo&state=haoread&connect_redirect=1#wechat_redirect'>☞点我继续上次阅读</a>
+
+历史阅读记录：
+
+☞<a href='https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxd581300b5a3960eb&redirect_uri=http%3A%2F%2Fm.nikanxs.com%2Fwechatrdct%2Fauth%3Fe%3Dproduct%26backUrl%3Dhttp%253A%252F%252Fwww.nikanxs.com%252Fbookpage%252F%253Fbid%253D4789&response_type=code&scope=snsapi_userinfo&state=haoread&connect_redirect=1#wechat_redirect'>花落乡野</a>\"
+            
+            
+            "]
+            ];
+            $result = $this->wechatApi->sendCustomerMessage($content);
+
+            if(isset($result)&&$result['errmsg']=='ok'){
+
+            }else{
+                var_dump($result);
             }
+
+            //回复首次关注后的消息
+
+
+
+        }elseif(isset($data['event'])&&$data['event']=='replyRecent'){
+            //回复书架或者最近阅读url
+            //回复最近阅读章节
+            $content = ['kf_account'=>'kf2002@gh_26a30bfcfb6e','touser'=>$data['openid'],'msgtype'=>'text','text'=>['content'=>
+                "https://w.url.cn/s/AtbX8nN"]
+            ];
+            $result = $this->wechatApi->sendCustomerMessage($content);
+
+            if(isset($result)&&$result['errmsg']=='ok'){
+
+            }else{
+                var_dump($result);
+            }
+
+
+
+
+        }elseif(isset($data['event'])&&$data['event']=='allCustomerMsg'){
+            //群发客服消息
+
+        }elseif(isset($data['event'])&&$data['event']=='replyText'){
+            //待定
+
         }
-        MegaWechatServer::$taskActiveNum->sub(1);
-        $server->finish("finish");
+
+//        $data = $this->wechatApi->isSubscribe($data);
+//        var_dump($data);
     }
 
     /**
@@ -190,12 +132,7 @@ class MegaWechatProtocol extends Base
      */
     function onFinish(\swoole_server $server, $taskId, $data)
     {
-        if (MegaWechatServer::$taskActiveNum->get() < $this->taskWorkerNum) {
-            if (($message = $this->queue->pop()) !== null) {
-                MegaWechatServer::$taskActiveNum->add(1);
-                $server->task($message);
-            }
-        }
+
     }
 
     function onRequest($request, $response)

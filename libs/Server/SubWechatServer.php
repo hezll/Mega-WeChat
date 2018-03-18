@@ -13,7 +13,7 @@ use Swoole\Service\Implement\TcpServer;
 use Swoole\Util\Config;
 use Wechat\WechatTemplateModel;
 
-class MegaWechatServer extends TcpServer
+class SubWechatServer extends TcpServer
 {
     /** @var \swoole_atomic */
     public static $taskActiveNum;
@@ -22,7 +22,7 @@ class MegaWechatServer extends TcpServer
      */
     public static $templateTable;
 
-    protected $processName = 'MegaWechatServer';
+    protected $processName = 'SubWechatServer';
 
     public $setting = [
         'open_eof_check' => false,
@@ -35,17 +35,11 @@ class MegaWechatServer extends TcpServer
 
     public function init()
     {
-        self::$taskActiveNum = new \swoole_atomic(0);
-        self::$templateTable = new \swoole_table(Config::get('server.table_size'));
-        self::$templateTable->column('tmpl', \swoole_table::TYPE_STRING, Config::get('server.template_size'));
-        self::$templateTable->create();
 
-        $model = new WechatTemplateModel();
-        $templates = $model->getAll(Config::get('server.table_size'));
-        foreach($templates as $template)
-        {
-            self::$templateTable->set($template['tmpl_key'], ['tmpl' => $template['template']]);
-        }
+//        swoole_timer_tick(1000, function(){
+//            echo "timeout\n";
+//        });
+
     }
 
 }

@@ -98,9 +98,12 @@ class WechatApi extends BaseWechatApi
      */
     public function getAccessToken($force = false)
     {
+        echo 'get Access Token';
         $this->_accessToken = $this->_wxtokenTable->get($this->appId);
         $time = time(); // 为了更精确控制.取当前时间计算
-        if ($force || !$this->_accessToken ||  $this->_accessToken === null || (isset($this->_accessToken['expire'])&& $this->_accessToken['expire'] < ($time - 180)))  {
+        if ($force || !$this->_accessToken ||  $this->_accessToken === null || (isset($this->_accessToken['expire']) && $this->_accessToken['expire'] < ($time - 180)))  {
+
+            echo 'come';
             if (!($result = $this->requestAccessToken())) {
                 throw new \Exception('Fail to get access_token from wechat server.', 500);
             }
@@ -110,6 +113,22 @@ class WechatApi extends BaseWechatApi
 
         }
         return $this->_accessToken['access_token'];
+    }
+
+
+    /**
+    * 设置AccessToken
+    * @param array $accessToken  重写，私有函数无法继承
+    * @throws \InvalidArgumentException
+    */
+    public function setAccessToken(array $accessToken)
+    {
+        if (!isset($accessToken['access_token'])) {
+            throw new \InvalidArgumentException('The wechat access_token must be set.');
+        } elseif(!isset($accessToken['expire'])) {
+            throw new \InvalidArgumentException('Wechat access_token expire time must be set.');
+        }
+        $this->_accessToken = $accessToken;
     }
     /**
      * @inheritdoc
@@ -149,21 +168,15 @@ class WechatApi extends BaseWechatApi
      */
     public function sendTemplateMessage($data, $force = false)
     {
+        $token = $this->getAccessToken($force);
         $url = $this->httpBuildQuery(self::WECHAT_TEMPLATE_MESSAGE_SEND_PREFIX, [
-            'access_token' => $this->getAccessToken($force)
+            'access_token' => $token
         ]);
 
         $result = $this->http($url, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : $data
         ]);
-
-        switch ($result['errcode']) {
-            case 42001 : // token过期
-            case 40001 : // 不是最新的token
-                $result = $this->sendTemplateMessage($data, true);
-                return $result;
-        }
 
         return $result;
     }
@@ -181,8 +194,9 @@ class WechatApi extends BaseWechatApi
      */
     public function sendCustomerMessage($data, $force = false)
     {
+        $token =$this->getAccessToken();//请单独拿出来处理
         $url = $this->httpBuildQuery(self::WECHAT_CUSTOMER_MESSAGE_SEND_PREFIX, [
-            'access_token' => $this->getAccessToken($force)
+            'access_token' => $token
         ]);
 
         $result = $this->http($url, [
@@ -190,13 +204,27 @@ class WechatApi extends BaseWechatApi
             CURLOPT_POSTFIELDS => is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : $data
         ]);
 
-        switch ($result['errcode']) {
-            case 42001 : // token过期
-            case 40001 : // 不是最新的token
-                $result = $this->sendCustomerMessage($data, true);
-                return $result;
-        }
+        return $result;
+    }
 
+    /**
+     * 判断用户是否关注公众号
+     */
+    const WECHAT_CUSTOMER_SUBSCRIBE_PREFIX = '/cgi-bin/user/info';
+    /**
+     * 判断是否订阅
+     * @param array $data 模板需要的数据
+     * @param bool $force 强制获取token
+     * @return int|bool
+     */
+    public function isSubscribe($openid, $force = false)
+    {
+        $token =$this->getAccessToken();//请单独拿出来处理
+        $url = $this->httpBuildQuery(self::WECHAT_CUSTOMER_SUBSCRIBE_PREFIX,[
+            'access_token' => $token,
+            'openid'=>$openid
+        ]);
+        $result = $this->http($url);
         return $result;
     }
 }
