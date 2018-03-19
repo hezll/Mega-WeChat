@@ -71,19 +71,7 @@ class SubWechatProtocol extends Base
         //关注后回复消息
         if(isset($data['event'])&&$data['event']=='replySub'){
             //回复最近阅读章节
-            $content = ['kf_account'=>'kf2002@gh_26a30bfcfb6e','touser'=>$data['openid'],'msgtype'=>'text','text'=>['content'=>
-                "\"您已连续签到1天，获得18书币奖励，连续签到最多每日获得33书币奖励～
-
-
-<a href='https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxd581300b5a3960eb&redirect_uri=http%3A%2F%2Fm.nikanxs.com%2Fwechatrdct%2Fauth%3Fe%3Dproduct%26backUrl%3Dhttp%253A%252F%252Fwww.nikanxs.com%252Fread%252F%253Fbid%253D4789%2526chapter%253D305007&response_type=code&scope=snsapi_userinfo&state=haoread&connect_redirect=1#wechat_redirect'>☞点我继续上次阅读</a>
-
-历史阅读记录：
-
-☞<a href='https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxd581300b5a3960eb&redirect_uri=http%3A%2F%2Fm.nikanxs.com%2Fwechatrdct%2Fauth%3Fe%3Dproduct%26backUrl%3Dhttp%253A%252F%252Fwww.nikanxs.com%252Fbookpage%252F%253Fbid%253D4789&response_type=code&scope=snsapi_userinfo&state=haoread&connect_redirect=1#wechat_redirect'>花落乡野</a>\"
-            
-            
-            "]
-            ];
+            $content = $data['content'];
             $result = $this->wechatApi->sendCustomerMessage($content);
 
             if(isset($result)&&$result['errmsg']=='ok'){

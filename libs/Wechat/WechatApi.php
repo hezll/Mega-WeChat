@@ -194,7 +194,7 @@ class WechatApi extends BaseWechatApi
      */
     public function sendCustomerMessage($data, $force = false)
     {
-        $token =$this->getAccessToken();//请单独拿出来处理
+        $token =$this->getAccessToken($force);//请单独拿出来处理
         $url = $this->httpBuildQuery(self::WECHAT_CUSTOMER_MESSAGE_SEND_PREFIX, [
             'access_token' => $token
         ]);
@@ -203,6 +203,12 @@ class WechatApi extends BaseWechatApi
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : $data
         ]);
+
+        if(isset($result['errcode'])&&$result['errcode']=='40001'&&strstr($result['errmsg'],'access_token')===true){
+
+            $result = $this->sendCustomerMessage($data,true);
+
+        }
 
         return $result;
     }
@@ -219,7 +225,7 @@ class WechatApi extends BaseWechatApi
      */
     public function isSubscribe($openid, $force = false)
     {
-        $token =$this->getAccessToken();//请单独拿出来处理
+        $token =$this->getAccessToken($force);//请单独拿出来处理
         $url = $this->httpBuildQuery(self::WECHAT_CUSTOMER_SUBSCRIBE_PREFIX,[
             'access_token' => $token,
             'openid'=>$openid
