@@ -105,7 +105,7 @@ class WechatApi extends BaseWechatApi
 
             echo 'come';
             if (!($result = $this->requestAccessToken())) {
-                throw new \Exception('Fail to get access_token from wechat server.', 500);
+                throw new \Exception('Fail to get access_token from wechat server.'.json_encode($result), 500);
             }
             $result['expire'] = $time + $result['expires_in'];
             $this->setAccessToken($result);
@@ -204,12 +204,19 @@ class WechatApi extends BaseWechatApi
             CURLOPT_POSTFIELDS => is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : $data
         ]);
 
-        if(isset($result['errcode'])&&$result['errcode']=='40001'&&strstr($result['errmsg'],'access_token')===true){
+        //$result['errcode']='40001';
+        //$result['errmsg']='access_token is invalid or not latest hint';
 
+        $i = 0;
+        if(isset($result['errcode'])&&$result['errcode']=='40001'&&strpos($result,'access_token')===true){
+            echo '|||---rebuild token when send CustomerMessge';
             $result = $this->sendCustomerMessage($data,true);
+sleep(5);
+            $i++;
 
         }
 
+        //var_dump($result);exit;
         return $result;
     }
 
