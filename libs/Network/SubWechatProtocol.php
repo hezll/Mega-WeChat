@@ -75,8 +75,10 @@ class SubWechatProtocol extends Base
             $result = $this->wechatApi->sendCustomerMessage($content);
 
             if(isset($result)&&$result['errmsg']=='ok'){
+                echo '.s';
 
             }else{
+                echo ('.s推送失败时间：'.date( 'Y-m-d H:i:s' , time()).'...');
                 var_dump($result);
             }
 
@@ -93,8 +95,9 @@ class SubWechatProtocol extends Base
             $result = $this->wechatApi->sendCustomerMessage($content);
 
             if(isset($result)&&$result['errmsg']=='ok'){
-
+                echo '.r';
             }else{
+                echo ('.r推送失败时间：'.date( 'Y-m-d H:i:s' , time()).'...');
                 var_dump($result);
             }
 

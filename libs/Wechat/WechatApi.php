@@ -98,12 +98,12 @@ class WechatApi extends BaseWechatApi
      */
     public function getAccessToken($force = false)
     {
-        echo 'get Access Token';
+
         $this->_accessToken = $this->_wxtokenTable->get($this->appId);
         $time = time(); // 为了更精确控制.取当前时间计算
         if ($force || !$this->_accessToken ||  $this->_accessToken === null || (isset($this->_accessToken['expire']) && $this->_accessToken['expire'] < ($time - 180)))  {
 
-            echo 'come';
+            echo '--come-new token';
             if (!($result = $this->requestAccessToken())) {
                 throw new \Exception('Fail to get access_token from wechat server.'.json_encode($result), 500);
             }
@@ -112,6 +112,7 @@ class WechatApi extends BaseWechatApi
             $this->_wxtokenTable->set($this->appId,$result);
 
         }
+        echo '.t';
         return $this->_accessToken['access_token'];
     }
 
@@ -208,12 +209,9 @@ class WechatApi extends BaseWechatApi
         //$result['errmsg']='access_token is invalid or not latest hint';
 
         $i = 0;
-        if(isset($result['errcode'])&&$result['errcode']=='40001'&&strpos($result['errmsg'],'access_token')===true){
+        if(isset($result['errcode'])&&$result['errcode']=='40001'&&strpos($result['errmsg'],'access_token is invalid or not latest hint')===true){
             echo '|||---rebuild token when send CustomerMessge';
             $result = $this->sendCustomerMessage($data,true);
-sleep(5);
-            $i++;
-
         }
 
         //var_dump($result);exit;
