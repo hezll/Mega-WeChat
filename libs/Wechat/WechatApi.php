@@ -181,11 +181,11 @@ class WechatApi extends BaseWechatApi
 
         if(isset($result['errcode'])&&$result['errcode']=='40001'){
 
-            if(strpos($result['errmsg'],'access_token')===true) {
+            if(strpos($result['errmsg'],'access_token')===false) {
+                echo '|||---access_token sendTemplateMessage不在'.$result['errmsg'].'中';
+            }else{
                 echo '|||---rebuild token when send sendTemplateMessage';
                 $result = $this->sendTemplateMessage($data, true);
-            }else{
-                echo '|||---access_token sendTemplateMessage不在'.$result['errmsg'].'中';
             }
         }
         return $result;
@@ -220,11 +220,11 @@ class WechatApi extends BaseWechatApi
         $i = 0;
         if(isset($result['errcode'])&&$result['errcode']=='40001'){
 
-            if(strpos($result['errmsg'],'access_token')===true) {
+            if(strpos($result['errmsg'],'access_token')===false) {
+                echo '|||---access_token CustomerMessge不在'.$result['errmsg'].'中';
+            }else{
                 echo '|||---rebuild token when send CustomerMessge';
                 $result = $this->sendCustomerMessage($data, true);
-            }else{
-                echo '|||---access_token CustomerMessge不在'.$result['errmsg'].'中';
             }
         }
 
