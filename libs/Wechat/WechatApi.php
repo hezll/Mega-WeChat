@@ -181,7 +181,7 @@ class WechatApi extends BaseWechatApi
 
         if(isset($result['errcode'])&&$result['errcode']=='40001'){
 
-            if(strpos($result['errmsg'],'access_token is invalid or not latest hint')===true) {
+            if(strpos($result['errmsg'],'access_token')===true) {
                 echo '|||---rebuild token when send sendTemplateMessage';
                 $result = $this->sendTemplateMessage($data, true);
             }else{
@@ -220,7 +220,7 @@ class WechatApi extends BaseWechatApi
         $i = 0;
         if(isset($result['errcode'])&&$result['errcode']=='40001'){
 
-            if(strpos($result['errmsg'],'access_token is invalid or not latest hint')===true) {
+            if(strpos($result['errmsg'],'access_token')===true) {
                 echo '|||---rebuild token when send CustomerMessge';
                 $result = $this->sendCustomerMessage($data, true);
             }else{
