@@ -179,6 +179,15 @@ class WechatApi extends BaseWechatApi
             CURLOPT_POSTFIELDS => is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : $data
         ]);
 
+        if(isset($result['errcode'])&&$result['errcode']=='40001'){
+
+            if(strpos($result['errmsg'],'access_token is invalid or not latest hint')===true) {
+                echo '|||---rebuild token when send sendTemplateMessage';
+                $result = $this->sendTemplateMessage($data, true);
+            }else{
+                echo '|||---access_token sendTemplateMessage不在'.$result['errmsg'].'中';
+            }
+        }
         return $result;
     }
 
@@ -209,9 +218,14 @@ class WechatApi extends BaseWechatApi
         //$result['errmsg']='access_token is invalid or not latest hint';
 
         $i = 0;
-        if(isset($result['errcode'])&&$result['errcode']=='40001'&&strpos($result['errmsg'],'access_token is invalid or not latest hint')===true){
-            echo '|||---rebuild token when send CustomerMessge';
-            $result = $this->sendCustomerMessage($data,true);
+        if(isset($result['errcode'])&&$result['errcode']=='40001'){
+
+            if(strpos($result['errmsg'],'access_token is invalid or not latest hint')===true) {
+                echo '|||---rebuild token when send CustomerMessge';
+                $result = $this->sendCustomerMessage($data, true);
+            }else{
+                echo '|||---access_token CustomerMessge不在'.$result['errmsg'].'中';
+            }
         }
 
         //var_dump($result);exit;
